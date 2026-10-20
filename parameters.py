@@ -1,5 +1,5 @@
 """
-PA 7: The Parameter Simulator -- starter.
+PA 7: The Parameter Simulator.
 
 Complete bind_parameters, commit_value_result, and Closure below.
 Cell, evaluate(), and FunctionDecl are already provided -- do not
@@ -75,8 +75,29 @@ def bind_parameters(param_specs: List[Tuple[str, str]], arg_nodes: list, caller_
     delayed write-back later -- store it whichever way you like (e.g.
     an attribute on callee_record such as callee_record.pending_writeback).
     """
-    # TODO
-    raise NotImplementedError
+    if len(param_specs) != len(arg_nodes):
+        raise ValueError("Parameter and argument counts must match.")
+
+    callee_record.pending_writeback = []
+    for (name, mode), argument in zip(param_specs, arg_nodes):
+        if mode == "value":
+            # Copy the value into private storage, not the caller's Cell.
+            local_cell = Cell(evaluate(argument, caller_env))
+        elif mode in ("reference", "value-result"):
+            if not isinstance(argument, Variable):
+                raise TypeError(f"{mode} argument for '{name}' must be a variable.")
+            destination = caller_env.resolve(argument.name)
+            if not isinstance(destination, Cell):
+                raise TypeError(f"Argument '{argument.name}' must resolve to a Cell.")
+            if mode == "reference":
+                local_cell = destination
+            else:
+                local_cell = Cell(destination.value)
+                # Save the actual destination now, in declaration order.
+                callee_record.pending_writeback.append((local_cell, destination))
+        else:
+            raise ValueError(f"Unknown parameter mode: {mode!r}.")
+        callee_record.locals_env.define(name, local_cell)
 
 
 def commit_value_result(callee_record, caller_env: Environment) -> None:
@@ -86,14 +107,16 @@ def commit_value_result(callee_record, caller_env: Environment) -> None:
     corresponding variable now (call this only after the callee's body
     has finished running).
     """
-    # TODO
-    raise NotImplementedError
+    # Destinations were resolved at call time; do not resolve names again.
+    for local_cell, destination in getattr(callee_record, "pending_writeback", []):
+        destination.value = local_cell.value
+    callee_record.pending_writeback = []
 
 
 class Closure:
     def __init__(self, declaration: FunctionDecl, defining_env: Environment) -> None:
-        # TODO
-        raise NotImplementedError
+        self.declaration = declaration
+        self.defining_env = defining_env
 
     def call(self, args: list, caller_env: Environment):
         """
@@ -103,5 +126,9 @@ class Closure:
         values, wrapped in a Cell), then evaluate declaration.body in
         that new environment and return the result.
         """
-        # TODO
-        raise NotImplementedError
+        if len(args) != len(self.declaration.params):
+            raise ValueError("Parameter and argument counts must match.")
+        callee_env = Environment(parent=self.defining_env)
+        for name, value in zip(self.declaration.params, args):
+            callee_env.define(name, Cell(value))
+        return evaluate(self.declaration.body, callee_env)

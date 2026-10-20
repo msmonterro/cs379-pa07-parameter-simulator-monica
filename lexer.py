@@ -1,8 +1,5 @@
 """
-PA 5 dependency: paste in YOUR OWN completed PA 2 lexer.py here.
-(Needed transitively -- symtable.py imports from parser.py, which
-imports from this file. PA 5's own new work doesn't touch lexing or
-parsing directly.)
+USILang lexer dependency: completed PA 2 interface.
 
 This is the same file from PA 2's repo -- copy your own working
 tokenize() implementation over this stub before starting parser.py.
@@ -30,8 +27,13 @@ class LexError(Exception):
     pass
 
 
-# TODO: build your master regex here, e.g.:
-# _MASTER_RE = re.compile(r"(?P<NUMBER>\d+)|(?P<IDENT>[A-Za-z_]\w*)|...")
+_MASTER_RE = re.compile(
+    r"(?P<NUMBER>\d+)|(?P<IDENT>[A-Za-z_]\w*)"
+    r"|(?P<PLUS>\+)|(?P<MINUS>-)|(?P<STAR>\*)|(?P<SLASH>/)"
+    r"|(?P<LPAREN>\()|(?P<RPAREN>\))|(?P<ASSIGN>=)|(?P<SEMI>;)"
+    r"|(?P<COMMENT>\#[^\n]*)|(?P<NEWLINE>\n)"
+    r"|(?P<WHITESPACE>[^\S\n]+)|(?P<MISMATCH>.)"
+)
 
 
 def tokenize(source: str) -> List[Token]:
@@ -43,5 +45,20 @@ def tokenize(source: str) -> List[Token]:
     them. Track 1-indexed line numbers. Raise LexError (with the
     offending character and line) on unrecognized input.
     """
-    # TODO
-    raise NotImplementedError
+    tokens = []
+    line = 1
+    for match in _MASTER_RE.finditer(source):
+        token_type = match.lastgroup
+        lexeme = match.group()
+        if token_type == "NEWLINE":
+            line += 1
+        elif token_type in ("COMMENT", "WHITESPACE"):
+            continue
+        elif token_type == "MISMATCH":
+            raise LexError(f"Unrecognized character {lexeme!r} on line {line}.")
+        else:
+            if token_type == "IDENT" and lexeme == "let":
+                token_type = "LET"
+            tokens.append(Token(token_type, lexeme, line))
+    tokens.append(Token("EOF", "", line))
+    return tokens

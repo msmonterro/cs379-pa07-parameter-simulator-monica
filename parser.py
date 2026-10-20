@@ -1,6 +1,5 @@
 """
-PA 5 dependency: paste in YOUR OWN completed PA 3 parser.py here
-(needed transitively -- symtable.py imports from this file).
+USILang parser dependency: completed PA 3 interface.
 
 Complete the parsing functions below. AST node types are already
 defined -- do not modify them. See the assignment,
@@ -79,38 +78,69 @@ class _ParserState:
 
 
 def parse_factor(state: _ParserState):
-    # TODO
-    raise NotImplementedError
+    tok = state.peek()
+    if tok.type == "NUMBER":
+        state.advance()
+        return Number(int(tok.lexeme), tok.line)
+    if tok.type == "IDENT":
+        state.advance()
+        return Variable(tok.lexeme, tok.line)
+    if tok.type == "LPAREN":
+        state.advance()
+        expr = parse_expr(state)
+        state.expect("RPAREN")
+        return expr
+    raise ParseError(f"Line {tok.line}: expected a number, variable, or '(', found {tok.type}.")
 
 
 def parse_term(state: _ParserState):
-    # TODO
-    raise NotImplementedError
+    expr = parse_factor(state)
+    while state.peek().type in ("STAR", "SLASH"):
+        op = state.advance()
+        expr = BinOp(op.lexeme, expr, parse_factor(state), op.line)
+    return expr
 
 
 def parse_expr(state: _ParserState):
-    # TODO
-    raise NotImplementedError
+    expr = parse_term(state)
+    while state.peek().type in ("PLUS", "MINUS"):
+        op = state.advance()
+        expr = BinOp(op.lexeme, expr, parse_term(state), op.line)
+    return expr
 
 
 def parse_declaration(state: _ParserState) -> Declaration:
-    # TODO
-    raise NotImplementedError
+    start = state.expect("LET")
+    name = state.expect("IDENT")
+    state.expect("ASSIGN")
+    expr = parse_expr(state)
+    state.expect("SEMI")
+    return Declaration(name.lexeme, expr, start.line)
 
 
 def parse_assignment(state: _ParserState) -> Assignment:
-    # TODO
-    raise NotImplementedError
+    name = state.expect("IDENT")
+    state.expect("ASSIGN")
+    expr = parse_expr(state)
+    state.expect("SEMI")
+    return Assignment(name.lexeme, expr, name.line)
 
 
 def parse_statement(state: _ParserState):
-    # TODO: peek at state.peek().type to choose declaration vs. assignment
-    raise NotImplementedError
+    tok = state.peek()
+    if tok.type == "LET":
+        return parse_declaration(state)
+    if tok.type == "IDENT":
+        return parse_assignment(state)
+    raise ParseError(f"Line {tok.line}: expected a declaration or assignment, found {tok.type}.")
 
 
 def parse_program(state: _ParserState) -> Program:
-    # TODO: loop parse_statement() until EOF
-    raise NotImplementedError
+    statements = []
+    while state.peek().type != "EOF":
+        statements.append(parse_statement(state))
+    state.expect("EOF")
+    return Program(statements)
 
 
 def parse(tokens: List[Token]) -> Program:
